@@ -73,8 +73,13 @@ sp-session = { workspace = true }
 sp-std = { workspace = true }
 sp-transaction-pool = { workspace = true }
 sp-trie = { workspace = true }
+pallet-nfts = { workspace = true }
+pallet-insecure-randomness-collective-flip = { workspace = true }
 
 sp-version = { workspace = true }
+
+# Custom
+pallet-game = { workspace = true }
 
 # Polkadot
 pallet-xcm = { workspace = true }
@@ -179,6 +184,9 @@ std = [
 	"staging-xcm-executor/std",
 	"staging-xcm/std",
 	"xcm-primitives/std",
+	"pallet-nfts/std",
+	"pallet-insecure-randomness-collective-flip/std",
+	"pallet-game/std",
 ]
 
 # Allow to print logs details (no wasm:stripped)
@@ -223,6 +231,8 @@ runtime-benchmarks = [
 	"staging-xcm-builder/runtime-benchmarks",
 	"staging-xcm-executor/runtime-benchmarks",
 	"xcm-primitives/runtime-benchmarks",
+	"pallet-nfts/runtime-benchmarks",
+	"pallet-game/runtime-benchmarks",
 ]
 
 try-runtime = [
@@ -261,4 +271,7 @@ try-runtime = [
 	"polkadot-runtime-common/try-runtime",
 	"runtime-common/try-runtime",
 	"sp-runtime/try-runtime",
+	"pallet-nfts/try-runtime",
+	"pallet-insecure-randomness-collective-flip/try-runtime",
+	"pallet-game/try-runtime",
 ]
