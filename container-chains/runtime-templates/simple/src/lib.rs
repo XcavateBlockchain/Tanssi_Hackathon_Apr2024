@@ -25,7 +25,6 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 use cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
-use sp_core::{crypto::KeyTypeId, OpaqueMetadata, Encode};
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 
@@ -68,12 +67,12 @@ use {
     smallvec::smallvec,
     sp_api::impl_runtime_apis,
     sp_consensus_slots::{Slot, SlotDuration},
-    sp_core::{MaxEncodedLen, OpaqueMetadata},
+    sp_core::{MaxEncodedLen, OpaqueMetadata, crypto::KeyTypeId},
     sp_runtime::{
         create_runtime_str, generic, impl_opaque_keys,
         traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, Verify},
         transaction_validity::{TransactionSource, TransactionValidity},
-        ApplyExtrinsicResult, MultiSignature,
+        ApplyExtrinsicResult, MultiSignature, SaturatedConversion,
     },
     sp_std::prelude::*,
     sp_version::RuntimeVersion,
@@ -94,6 +93,9 @@ pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::Account
 
 /// Balance of an account.
 pub type Balance = u128;
+
+/// Index of a transaction in the chain.
+pub type Nonce = u32;
 
 /// Index of a transaction in the chain.
 pub type Index = u32;
@@ -118,6 +120,8 @@ pub type SignedBlock = generic::SignedBlock<Block>;
 
 /// BlockId type as expected by this runtime.
 pub type BlockId = generic::BlockId<Block>;
+
+pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
 
 /// The SignedExtension to the basic transaction logic.
 pub type SignedExtra = (
@@ -699,6 +703,7 @@ parameter_types! {
 	pub const GamePalletId: PalletId = PalletId(*b"py/rlxdl");
 	pub const MaxOngoingGame: u32 = 200;
     pub const UnsignedPriority: u64 = 1 << 20;
+    pub const LeaderLimit: u32 = 10;
 }
 
 /// Configure the pallet-game in pallets/game.
@@ -713,6 +718,8 @@ impl pallet_game::Config for Runtime {
 	type MaxOngoingGames = MaxOngoingGame;
 	type GameRandomness = RandomnessCollectiveFlip;
 	type StringLimit = StringLimit;
+    type LeaderboardLimit = LeaderLimit;
+	type AuthorityId = pallet_game::crypto::TestAuthId;
     type GracePeriod = ConstU32<5>;
     type UnsignedInterval = ConstU32<2>;
     type UnsignedPriority = UnsignedPriority;

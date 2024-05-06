@@ -130,6 +130,7 @@ impl sp_core::Get<u32> for MaxProperties {
 parameter_types! {
 	pub const GamePalletId: PalletId = PalletId(*b"py/rlxdl");
 	pub const MaxOngoingGame: u32 = 200;
+	pub const LeaderLimit: u32 = 10;
 }
 
 /// Configure the pallet-game in pallets/game.
@@ -144,6 +145,7 @@ impl pallet_game::Config for Test {
 	type MaxOngoingGames = MaxOngoingGame;
 	type GameRandomness = RandomnessCollectiveFlip;
 	type StringLimit = ConstU32<5000>;
+	type LeaderboardLimit = LeaderLimit;
 }
 
 // Build genesis storage according to the mock runtime.
