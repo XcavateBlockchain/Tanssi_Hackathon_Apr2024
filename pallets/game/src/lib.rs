@@ -43,6 +43,73 @@ use enumflags2::BitFlags;
 
 use frame_support::traits::Randomness;
 
+use codec::{Decode, Encode};
+use frame_support::traits::Get;
+use frame_system::{
+	self as system,
+	offchain::{
+		AppCrypto, CreateSignedTransaction, SendSignedTransaction, SendUnsignedTransaction,
+		SignedPayload, Signer, SigningTypes, SubmitTransaction,
+	},
+	pallet_prelude::BlockNumberFor,
+};
+use lite_json::json::JsonValue;
+use scale_info::prelude::string::String;
+use sp_core::crypto::KeyTypeId;
+
+use sp_runtime::{
+	offchain::{
+		http,
+		storage::{MutateStorageError, StorageRetrievalError, StorageValueRef},
+		Duration,
+	},
+	traits::Zero,
+	transaction_validity::{InvalidTransaction, TransactionValidity, ValidTransaction},
+	BoundedVec, RuntimeDebug,
+};
+use sp_std::vec::Vec;
+
+
+/// Defines application identifier for crypto keys of this module.
+///
+/// Every module that deals with signatures needs to declare its unique identifier for
+/// its crypto keys.
+/// When offchain worker is signing transactions it's going to request keys of type
+/// `KeyTypeId` from the keystore and use the ones it finds to sign the transaction.
+/// The keys can be inserted manually via RPC (see `author_insertKey`).
+pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"btc!");
+
+/// Based on the above `KeyTypeId` we need to generate a pallet-specific crypto type wrappers.
+/// We can use from supported crypto kinds (`sr25519`, `ed25519` and `ecdsa`) and augment
+/// the types with this pallet-specific identifier.
+pub mod crypto {
+	use super::KEY_TYPE;
+	use sp_core::sr25519::Signature as Sr25519Signature;
+	use sp_runtime::{
+		app_crypto::{app_crypto, sr25519},
+		traits::Verify,
+		MultiSignature, MultiSigner,
+	};
+	app_crypto!(sr25519, KEY_TYPE);
+
+	pub struct TestAuthId;
+
+	impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for TestAuthId {
+		type RuntimeAppPublic = Public;
+		type GenericSignature = sp_core::sr25519::Signature;
+		type GenericPublic = sp_core::sr25519::Public;
+	}
+
+	// implemented for mock runtime in test
+	impl frame_system::offchain::AppCrypto<<Sr25519Signature as Verify>::Signer, Sr25519Signature>
+		for TestAuthId
+	{
+		type RuntimeAppPublic = Public;
+		type GenericSignature = sp_core::sr25519::Signature;
+		type GenericPublic = sp_core::sr25519::Public;
+	}
+}
+
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
@@ -139,16 +206,18 @@ pub mod pallet {
 
 	/// Struct to store the property data for a game.
 	#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, frame_support::pallet_prelude::RuntimeDebugNoBound, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
 	pub struct PropertyInfoData<T: Config> {
 		pub id: u32,
-		pub property_type: BoundedVec<u8, <T as Config>::StringLimit>,
 		pub bedrooms: u32,
 		pub bathrooms: u32,
-		pub city: BoundedVec<u8, <T as Config>::StringLimit>,
-		pub post_code: BoundedVec<u8, <T as Config>::StringLimit>,
-		pub key_features: BoundedVec<u8, <T as Config>::StringLimit>,
+		pub summary: BoundedVec<u8, <T as Config>::StringLimit>,
+		pub property_sub_type: BoundedVec<u8, <T as Config>::StringLimit>,
+		pub first_visible_date: BoundedVec<u8, <T as Config>::StringLimit>,
+		pub display_size: BoundedVec<u8, <T as Config>::StringLimit>,
+		pub display_address: BoundedVec<u8, <T as Config>::StringLimit>,
+		// pub property_images: BoundedVec<u8, <T as Config>::StringLimit>,
 	}
 
 	/// Struct for the user datas.
@@ -160,6 +229,7 @@ pub mod pallet {
 		pub wins: u32,
 		pub losses: u32,
 		pub practise_rounds: u8,
+		pub last_played_round: u32,
 		pub nfts: CollectedColors,
 	}
 
@@ -358,9 +428,43 @@ pub mod pallet {
 		}
 	}
 
+		// Preperty Info Data struct
+		#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+		#[derive(
+			Encode,
+			Decode,
+			Clone,
+			PartialEq,
+			Eq,
+			MaxEncodedLen,
+			frame_support::pallet_prelude::RuntimeDebugNoBound,
+			TypeInfo,
+		)]
+		#[scale_info(skip_type_params(T))]
+		pub struct PropertyDataInfo<T: Config> {
+			pub id: u32,
+			pub bedrooms: u32,
+			pub bathrooms: u32,
+			pub summary: BoundedVec<u8, <T as Config>::StringLimit>,
+			pub property_sub_type: BoundedVec<u8, <T as Config>::StringLimit>,
+			pub first_visible_date: BoundedVec<u8, <T as Config>::StringLimit>,
+			pub display_size: BoundedVec<u8, <T as Config>::StringLimit>,
+			pub display_address: BoundedVec<u8, <T as Config>::StringLimit>,
+			// pub property_images: BoundedVec<u8, <T as Config>::StringLimit>,
+		}
+	
+	
+		enum TransactionType {
+			Signed,
+			UnsignedForAny,
+			UnsignedForAll,
+			Raw,
+			None,
+		}
+
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_nfts::Config //+ pallet_babe::Config
+	pub trait Config: CreateSignedTransaction<Call<Self>> + frame_system::Config + pallet_nfts::Config //+ pallet_babe::Config
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -398,6 +502,36 @@ pub mod pallet {
 		/// The maximum length of data stored in string.
 		#[pallet::constant]
 		type StringLimit: Get<u32>;
+		/// The maximum length of leaderboard.
+		#[pallet::constant]
+		type LeaderboardLimit: Get<u32>;
+		/// OCW configuration settings
+		/// The identifier type for an offchain worker.
+		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
+		// Configuration parameters
+
+		/// A grace period after we send transaction.
+		///
+		/// To avoid sending too many transactions, we only attempt to send one
+		/// every `GRACE_PERIOD` blocks. We use Local Storage to coordinate
+		/// sending between distinct runs of this offchain worker.
+		#[pallet::constant]
+		type GracePeriod: Get<BlockNumberFor<Self>>;
+		/// Number of blocks of cooldown after unsigned transaction is included.
+		///
+		/// This ensures that we only accept unsigned transactions once, every `UnsignedInterval`
+		/// blocks.
+		#[pallet::constant]
+		type UnsignedInterval: Get<BlockNumberFor<Self>>;
+		/// A configuration for base priority of unsigned transactions.
+		///
+		/// This is exposed so that it can be tuned for particular runtime, when
+		/// multiple pallets send unsigned transactions.
+		#[pallet::constant]
+		type UnsignedPriority: Get<TransactionPriority>;
+		/// Maximum number of prices.
+		#[pallet::constant]
+		type MaxPrices: Get<u32>;
 	}
 
 	pub type CollectionId<T> = <T as Config>::CollectionId;
@@ -446,6 +580,11 @@ pub mod pallet {
 	#[pallet::getter(fn game_id)]
 	pub type GameId<T> = StorageValue<_, u32, ValueQuery>;
 
+	/// The leaderboard of the game.
+	#[pallet::storage]
+	#[pallet::getter(fn leaderboard)]
+	pub type Leaderboard<T> = StorageValue<_, BoundedVec<(AccountIdOf<T>, u32), <T as Config>::LeaderboardLimit>, ValueQuery>;
+
 	/// Mapping of an account id to the user data of the account.
 	#[pallet::storage]
 	#[pallet::getter(fn users)]
@@ -488,11 +627,10 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// A List of test properties.
+	// A test property.
 	#[pallet::storage]
-	#[pallet::getter(fn test_properties)]
-	pub type TestProperties<T: Config> =
-		StorageValue<_, BoundedVec<PropertyInfoData<T>, T::MaxProperty>, ValueQuery>;
+	#[pallet::getter(fn test_property)]
+	pub type TestProperties<T: Config> = StorageValue<_, PropertyInfoData<T>, OptionQuery>;
 
 	/// Test for properties.
 	#[pallet::storage]
@@ -583,6 +721,35 @@ pub mod pallet {
 			});
 			weight
 		}
+
+		/// Offchain Worker entry point.
+		///
+		/// By implementing `fn offchain_worker` you declare a new offchain worker.
+		/// This function will be called when the node is fully synced and a new best block is
+		/// successfully imported.
+		/// Note that it's not guaranteed for offchain workers to run on EVERY block, there might
+		/// be cases where some blocks are skipped, or for some the worker runs twice (re-orgs),
+		/// so the code should be able to handle that.
+		/// You can use `Local Storage` API to coordinate runs of the worker.
+		fn offchain_worker(block_number: BlockNumberFor<T>) {
+			// Note that having logs compiled to WASM may cause the size of the blob to increase
+			// significantly. You can use `RuntimeDebug` custom derive to hide details of the types
+			// in WASM. The `sp-api` crate also provides a feature `disable-logging` to disable
+			// all logging and thus, remove any logging from the WASM.
+			log::info!("Hello World from offchain workers!");
+
+			let price = Self::fetch_property().map_err(|_| "Failed to fetch price");
+			//TestProperties::<T>::put(price.unwrap());
+
+			// Since off-chain workers are just part of the runtime code, they have direct access
+			// to the storage and other included pallets.
+			//
+			// We can easily import `frame_system` and retrieve a block hash of the parent block.
+			let parent_hash = <system::Pallet<T>>::block_hash(block_number - 1u32.into());
+			log::debug!("Current block: {:?} (parent hash: {:?})", block_number, parent_hash);
+
+			Self::fetch_property_and_send_signed();
+		}
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -624,7 +791,7 @@ pub mod pallet {
 				let color = NftColor::from_index(x).ok_or(Error::<T>::InvalidIndex)?;
 				CollectionColor::<T>::insert(collection_id, color);
 			}
-			Self::create_test_properties()?;
+			//Self::create_test_properties()?;
 			let mut round = Self::current_round();
 			round = round.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 			CurrentRound::<T>::put(round);
@@ -650,6 +817,7 @@ pub mod pallet {
 				wins: Default::default(),
 				losses: Default::default(),
 				practise_rounds: Default::default(),
+				last_played_round: Default::default(),
 				nfts: CollectedColors::default(),
 			};
 			Users::<T>::insert(player.clone(), user);
@@ -690,6 +858,10 @@ pub mod pallet {
 			let signer = ensure_signed(origin)?;
 			Self::check_enough_points(signer.clone(), game_type.clone())?;
 			ensure!(Self::round_active(), Error::<T>::NoActiveRound);
+			let mut user = Self::users(signer.clone()).ok_or(Error::<T>::UserNotRegistered)?;
+			if Self::current_round() != user.last_played_round {
+				user.nfts == Default::default();
+			}
 			let game_id = Self::game_id();
 			if game_type == DifficultyLevel::Player {
 				let current_block_number = <frame_system::Pallet<T>>::block_number();
@@ -716,14 +888,7 @@ pub mod pallet {
 					Ok::<(), DispatchError>(())
 				})?;
 			}
-			let (hashi, _) = T::GameRandomness::random(&[(game_id % 256) as u8]);
-			let u32_value = u32::from_le_bytes(
-				hashi.as_ref()[4..8].try_into().map_err(|_| Error::<T>::ConversionError)?,
-			);
-			let random_number = u32_value as usize %
-				Self::test_properties()
-					.len();
-			let property = Self::test_properties()[random_number].clone();
+			let property = Self::test_property().ok_or(Error::<T>::NoProperty)?;
 			let game_datas = GameData { difficulty: game_type, player: signer.clone(), property };
 			GameInfo::<T>::insert(game_id, game_datas);
 			let next_game_id = game_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
@@ -963,43 +1128,9 @@ pub mod pallet {
 				)?;
 				Listings::<T>::take(offer_details.listing_id)
 					.ok_or(Error::<T>::ListingDoesNotExist)?;
-				let mut user_offer = Self::users(offer_details.owner.clone())
-					.ok_or(Error::<T>::UserNotRegistered)?;
-				let color_listing = Self::collection_color(listing_details.collection_id)
-					.ok_or(Error::<T>::CollectionUnknown)?;
-				let color_offer = Self::collection_color(offer_details.collection_id)
-					.ok_or(Error::<T>::CollectionUnknown)?;
-				user_offer.add_nft_color(color_listing.clone())?;
-				let points = user_offer.calculate_points(color_listing.clone());
-				user_offer.points =
-					user_offer.points.checked_add(points).ok_or(Error::<T>::ArithmeticOverflow)?;
- 				user_offer.sub_nft_color(color_offer.clone())?;
-				let points = user_offer.subtracting_calculate_points(color_offer.clone());
-				user_offer.points =
-					user_offer.points.checked_sub(points).ok_or(Error::<T>::ArithmeticOverflow)?; 
-				Users::<T>::insert(offer_details.owner.clone(), user_offer.clone());
 
-				let mut user_listing =
-					Self::users(signer.clone()).ok_or(Error::<T>::UserNotRegistered)?;
-				user_listing.add_nft_color(color_offer.clone())?;
-				let points = user_listing.calculate_points(color_offer);
-				user_listing.points = user_listing
-					.points
-					.checked_add(points)
-					.ok_or(Error::<T>::ArithmeticOverflow)?;
-				user_listing.sub_nft_color(color_listing.clone())?;
-				let points = user_listing.subtracting_calculate_points(color_listing);
-				user_listing.points = user_listing
-					.points
-					.checked_sub(points)
-					.ok_or(Error::<T>::ArithmeticUnderflow)?;
-				Users::<T>::insert(signer.clone(), user_listing.clone());
-				if user_listing.has_four_of_all_colors() {
-					Self::end_game(signer.clone());
-				}
-				if user_offer.has_four_of_all_colors() {
-					Self::end_game(offer_details.owner.clone());
-				}
+				Self::swap_user_points(offer_details.owner.clone(), listing_details.collection_id, offer_details.collection_id)?;
+				Self::swap_user_points(signer.clone(), offer_details.collection_id, listing_details.collection_id)?;
 			} else {
 				pallet_nfts::Pallet::<T>::do_transfer(
 					offer_details.collection_id.into(),
@@ -1015,6 +1146,21 @@ pub mod pallet {
 			}
 			Self::deposit_event(Event::<T>::OfferHandeld { offer_id, offer });
 			Ok(())
+		}
+
+		#[pallet::call_index(10)]
+		#[pallet::weight({0})]
+		pub fn submit_price(
+			origin: OriginFor<T>,
+			property: PropertyInfoData<T>,
+		) -> DispatchResultWithPostInfo {
+			// Retrieve sender of the transaction.
+			let who = ensure_signed(origin)?;
+			// Add the price to the on-chain list.
+			// Self::add_price(Some(who), price);
+			TestProperties::<T>::put(property.clone());
+			//Self::deposit_event(Event::NewPrice { price: price.id.clone(), who });
+			Ok(().into())
 		}
 	}
 
@@ -1291,6 +1437,51 @@ pub mod pallet {
 					user.practise_rounds.checked_add(1).ok_or(Error::<T>::ArithmeticUnderflow)?;
 				Users::<T>::insert(game_info.player.clone(), user);
 			}
+			let mut user =
+				Self::users(game_info.player.clone()).ok_or(Error::<T>::UserNotRegistered)?;
+			Self::update_leaderboard(game_info.player, user.points)?;
+			Ok(())
+		}
+
+		fn update_leaderboard(user_id: AccountIdOf<T>, new_points: u32) -> DispatchResult {
+			let mut leaderboard = Self::leaderboard();
+			let leaderboard_size = leaderboard.len();
+		
+			if let Some((_, user_points)) = leaderboard.iter_mut().find(|(id, _)| *id == user_id) {
+				*user_points = new_points;
+				leaderboard.sort_by(|a, b| b.1.cmp(&a.1));
+				return Ok(());
+			}
+			if new_points > 0 && (leaderboard_size < 10 || new_points > leaderboard.last().map(|(_, points)| *points).unwrap_or(0)) {
+				if leaderboard.len() >= 10 {
+					leaderboard.pop();
+				}
+				leaderboard.try_push((user_id, new_points)).map_err(|_| Error::<T>::InvalidIndex)?;
+				leaderboard.sort_by(|a, b| b.1.cmp(&a.1));
+			}
+			Ok(())
+		}
+
+		fn swap_user_points(nft_holder: AccountIdOf<T>, collection_id_add: CollectionId<T>, collection_id_sub: CollectionId<T>) -> DispatchResult {
+				let mut user = Self::users(nft_holder.clone())
+					.ok_or(Error::<T>::UserNotRegistered)?;
+				let color_add = Self::collection_color(collection_id_add)
+					.ok_or(Error::<T>::CollectionUnknown)?;
+				let color_sub = Self::collection_color(collection_id_sub)
+					.ok_or(Error::<T>::CollectionUnknown)?;
+				user.add_nft_color(color_add.clone())?;
+				let points = user.calculate_points(color_add);
+				user.points =
+				user.points.checked_add(points).ok_or(Error::<T>::ArithmeticOverflow)?;
+				user.sub_nft_color(color_sub.clone())?;
+				let points = user.subtracting_calculate_points(color_sub);
+				user.points =
+				user.points.checked_sub(points).ok_or(Error::<T>::ArithmeticOverflow)?; 
+				Users::<T>::insert(nft_holder.clone(), user.clone());
+				Self::update_leaderboard(nft_holder.clone(), user.points)?;
+				if user.has_four_of_all_colors() {
+					Self::end_game(nft_holder);
+				}
 			Ok(())
 		}
 
@@ -1346,5 +1537,403 @@ pub mod pallet {
 		fn default_item_config() -> ItemConfig {
 			ItemConfig { settings: ItemSettings::all_enabled() }
 		}
+	}
+
+	impl<T: Config> Pallet<T> {
+		/// Fetch current price and return the result in cents.
+	fn fetch_property() -> Result<PropertyInfoData<T>, http::Error> {
+		// We want to keep the offchain worker execution time reasonable, so we set a hard-coded
+		// deadline to 2s to complete the external call.
+		// You can also wait indefinitely for the response, however you may still get a timeout
+		// coming from the host machine.
+		let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
+		// Initiate an external HTTP GET request.
+		// This is using high-level wrappers from `sp_runtime`, for the low-level calls that
+		// you can find in `sp_io`. The API is trying to be similar to `request`, but
+		// since we are running in a custom WASM execution environment we can't simply
+		// import the library here.
+
+		let request = http::Request::get(
+			"https://ipfs.io/ipfs/QmZ3Dn5B2UMuv9PFr1Ba3NGSKft2rwToBKCPaCTCmSab4k?filename=testing_data.json"
+		);
+
+		// We set the deadline for sending of the request, note that awaiting response can
+		// have a separate deadline. Next we send the request, before that it's also possible
+		// to alter request headers or stream body content in case of non-GET requests.
+		let pending = request.deadline(deadline).send().map_err(|_| http::Error::IoError)?;
+
+		// The request is already being processed by the host, we are free to do anything
+		// else in the worker (we can send multiple concurrent requests too).
+		// At some point however we probably want to check the response though,
+		// so we can block current thread and wait for it to finish.
+		// Note that since the request is being driven by the host, we don't have to wait
+		// for the request to have it complete, we will just not read the response.
+		let response = pending.try_wait(deadline).map_err(|_| http::Error::DeadlineReached)??;
+		// Let's check the status code before we proceed to reading the response.
+		if response.code != 200 {
+			log::warn!("Unexpected status code: {}", response.code);
+			return Err(http::Error::Unknown)
+		}
+
+		// Next we want to fully read the response body and collect it to a vector of bytes.
+		// Note that the return object allows you to read the body in chunks as well
+		// with a way to control the deadline.
+		let body = response.body().collect::<Vec<u8>>();
+
+		// Create a str slice from the body.
+		let body_str = sp_std::str::from_utf8(&body).map_err(|_| {
+			log::warn!("No UTF8 body");
+			http::Error::Unknown
+		})?;
+
+		let property = match Self::parse_property(body_str) {
+			Some(property) => Ok(property),
+			None => {
+				log::warn!("Unable to extract price from the response: {:?}", body_str);
+				Err(http::Error::Unknown)
+			},
+		}?;
+
+		// log::warn!("Got property: {:?} cents", price);
+
+		Ok(property)
+	}
+
+	/// Parse the price from the given JSON string using `lite-json`.
+	///
+	/// Returns `None` when parsing failed or `Some(price in cents)` when parsing is successful.
+	fn parse_property(property_str: &str) -> Option<PropertyInfoData<T>> {
+		let val = lite_json::parse_json(property_str);
+		let id = match val.ok()? {
+			JsonValue::Array(mut arr) => {
+				// Check if the array has at least one element
+				if let Some(obj) = arr.pop() {
+					// Check if the first element is an object
+					if let JsonValue::Object(obj) = obj {
+						// Find the 'id' field in the first object
+						if let Some((_, v)) =
+							obj.into_iter().find(|(k, _)| k.iter().copied().eq("id".chars()))
+						{
+							// Check if the value associated with 'id' is a number
+							if let JsonValue::Number(number) = v {
+								number
+							} else {
+								return None;
+							}
+						} else {
+							return None;
+						}
+					} else {
+						return None;
+					}
+				} else {
+					return None;
+				}
+			},
+			_ => return None,
+		};
+		let val = lite_json::parse_json(property_str);
+		let bedrooms = match val.ok()? {
+			JsonValue::Array(mut arr) => {
+				// Check if the array has at least one element
+				if let Some(obj) = arr.pop() {
+					// Check if the first element is an object
+					if let JsonValue::Object(obj) = obj {
+						// Find the 'bedrooms' field in the first object
+						if let Some((_, v)) =
+							obj.into_iter().find(|(k, _)| k.iter().copied().eq("bedrooms".chars()))
+						{
+							// Check if the value associated with 'id' is a number
+							if let JsonValue::Number(number) = v {
+								number
+							} else {
+								return None;
+							}
+						} else {
+							return None;
+						}
+					} else {
+						return None;
+					}
+				} else {
+					return None;
+				}
+			},
+			_ => return None,
+		};
+		let val = lite_json::parse_json(property_str);
+		let bathrooms = match val.ok()? {
+			JsonValue::Array(mut arr) => {
+				// Check if the array has at least one element
+				if let Some(obj) = arr.pop() {
+					// Check if the first element is an object
+					if let JsonValue::Object(obj) = obj {
+						// Find the 'bathrooms' field in the first object
+						if let Some((_, v)) =
+							obj.into_iter().find(|(k, _)| k.iter().copied().eq("bathrooms".chars()))
+						{
+							// Check if the value associated with 'id' is a number
+							if let JsonValue::Number(number) = v {
+								number
+							} else {
+								return None;
+							}
+						} else {
+							return None;
+						}
+					} else {
+						return None;
+					}
+				} else {
+					return None;
+				}
+			},
+			_ => return None,
+		};
+
+		let val = lite_json::parse_json(property_str);
+		let summary = match val.ok()? {
+			JsonValue::Array(mut arr) => {
+				// Check if the array has at least one element
+				if let Some(obj) = arr.pop() {
+					// Check if the first element is an object
+					if let JsonValue::Object(obj) = obj {
+						// Find the 'summary' field in the first object
+						if let Some((_, v)) =
+							obj.into_iter().find(|(k, _)| k.iter().copied().eq("summary".chars()))
+						{
+							// Check if the value associated with 'id' is a number
+							if let JsonValue::String(number) = v {
+								number
+							} else {
+								return None;
+							}
+						} else {
+							return None;
+						}
+					} else {
+						return None;
+					}
+				} else {
+					return None;
+				}
+			},
+			_ => return None,
+		};
+
+		let val = lite_json::parse_json(property_str);
+		let propertySubType = match val.ok()? {
+			JsonValue::Array(mut arr) => {
+				// Check if the array has at least one element
+				if let Some(obj) = arr.pop() {
+					// Check if the first element is an object
+					if let JsonValue::Object(obj) = obj {
+						// Find the 'propertySubType' field in the first object
+						if let Some((_, v)) = obj
+							.into_iter()
+							.find(|(k, _)| k.iter().copied().eq("propertySubType".chars()))
+						{
+							// Check if the value associated with 'id' is a number
+							if let JsonValue::String(number) = v {
+								number
+							} else {
+								return None;
+							}
+						} else {
+							return None;
+						}
+					} else {
+						return None;
+					}
+				} else {
+					return None;
+				}
+			},
+			_ => return None,
+		};
+
+		let val = lite_json::parse_json(property_str);
+		let firstVisibleDate = match val.ok()? {
+			JsonValue::Array(mut arr) => {
+				// Check if the array has at least one element
+				if let Some(obj) = arr.pop() {
+					// Check if the first element is an object
+					if let JsonValue::Object(obj) = obj {
+						// Find the 'firstVisibleDate' field in the first object
+						if let Some((_, v)) = obj
+							.into_iter()
+							.find(|(k, _)| k.iter().copied().eq("firstVisibleDate".chars()))
+						{
+							// Check if the value associated with 'id' is a number
+							if let JsonValue::String(number) = v {
+								number
+							} else {
+								return None;
+							}
+						} else {
+							return None;
+						}
+					} else {
+						return None;
+					}
+				} else {
+					return None;
+				}
+			},
+			_ => return None,
+		};
+
+		let val = lite_json::parse_json(property_str);
+		let displaySize = match val.ok()? {
+			JsonValue::Array(mut arr) => {
+				// Check if the array has at least one element
+				if let Some(obj) = arr.pop() {
+					// Check if the first element is an object
+					if let JsonValue::Object(obj) = obj {
+						// Find the 'displaySize' field in the first object
+						if let Some((_, v)) = obj
+							.into_iter()
+							.find(|(k, _)| k.iter().copied().eq("displaySize".chars()))
+						{
+							// Check if the value associated with 'id' is a number
+							if let JsonValue::String(number) = v {
+								number
+							} else {
+								return None;
+							}
+						} else {
+							return None;
+						}
+					} else {
+						return None;
+					}
+				} else {
+					return None;
+				}
+			},
+			_ => return None,
+		};
+
+		let val = lite_json::parse_json(property_str);
+		let displayAddress = match val.ok()? {
+			JsonValue::Array(mut arr) => {
+				// Check if the array has at least one element
+				if let Some(obj) = arr.pop() {
+					// Check if the first element is an object
+					if let JsonValue::Object(obj) = obj {
+						// Find the 'displayAddress' field in the first object
+						if let Some((_, v)) = obj
+							.into_iter()
+							.find(|(k, _)| k.iter().copied().eq("displayAddress".chars()))
+						{
+							// Check if the value associated with 'id' is a number
+							if let JsonValue::String(number) = v {
+								number
+							} else {
+								return None;
+							}
+						} else {
+							return None;
+						}
+					} else {
+						return None;
+					}
+				} else {
+					return None;
+				}
+			},
+			_ => return None,
+		};
+
+		let val = lite_json::parse_json(property_str);
+		let propertyImages = match val.ok()? {
+			JsonValue::Array(mut arr) => {
+				// Check if the array has at least one element
+				if let Some(obj) = arr.pop() {
+					// Check if the first element is an object
+					if let JsonValue::Object(obj) = obj {
+						// Find the 'propertyImages' field in the first object
+						if let Some((_, v)) = obj
+							.into_iter()
+							.find(|(k, _)| k.iter().copied().eq("propertyImages".chars()))
+						{
+							// Check if the value associated with 'id' is a number
+							if let JsonValue::String(number) = v {
+								number
+							} else {
+								return None;
+							}
+						} else {
+							return None;
+						}
+					} else {
+						return None;
+					}
+				} else {
+					return None;
+				}
+			},
+			_ => return None,
+		};
+
+		let id = id.integer as u32;
+		let bedrooms = bedrooms.integer as u32;
+		let bathrooms = bathrooms.integer as u32;
+		let summary: &str = &summary.iter().collect::<String>();
+		let propertySubType: &str = &propertySubType.iter().collect::<String>();
+		let firstVisibleDate: &str = &firstVisibleDate.iter().collect::<String>();
+		let displaySize: &str = &displaySize.iter().collect::<String>();
+		let displayAddress: &str = &displayAddress.iter().collect::<String>();
+		// let propertyImages: &str = &propertyImages.iter().collect::<String>();
+
+		let property = PropertyInfoData {
+			id,
+			bedrooms,
+			bathrooms,
+			summary: summary.as_bytes().to_vec().try_into().unwrap(),
+			property_sub_type: propertySubType.as_bytes().to_vec().try_into().unwrap(),
+			first_visible_date: firstVisibleDate.as_bytes().to_vec().try_into().unwrap(),
+			display_size: displaySize.as_bytes().to_vec().try_into().unwrap(),
+			display_address: displayAddress.as_bytes().to_vec().try_into().unwrap(),
+			// property_images: propertyImages.as_bytes().to_vec().try_into().unwrap(),
+		};
+
+		Some(property)
+
+		// Some(price.integer as u32 * 100 + (price.fraction / 10_u64.pow(exp)) as u32)
+	}
+
+	fn fetch_property_and_send_signed() -> Result<(), &'static str> {
+		let signer = Signer::<T, T::AuthorityId>::all_accounts();
+		if !signer.can_sign() {
+			return Err(
+				"No local accounts available. Consider adding one via `author_insertKey` RPC.",
+			)
+		}
+		// Make an external HTTP request to fetch the current price.
+		// Note this call will block until response is received.
+		let property = Self::fetch_property().map_err(|_| "Failed to fetch price")?;
+
+		// Using `send_signed_transaction` associated type we create and submit a transaction
+		// representing the call, we've just created.
+		// Submit signed will return a vector of results for all accounts that were found in the
+		// local keystore with expected `KEY_TYPE`.
+		let results = signer.send_signed_transaction(|_account| {
+			// Received price is wrapped into a call to `submit_price` public function of this
+			// pallet. This means that the transaction, when executed, will simply call that
+			// function passing `price` as an argument.
+			Call::submit_price { property: property.clone() }
+		});
+
+		for (acc, res) in &results {
+			match res {
+				Ok(()) => log::info!("[{:?}] Submitted price of {:?} cents", acc.id, property),
+				Err(e) => log::error!("[{:?}] Failed to submit transaction: {:?}", acc.id, e),
+			}
+		}
+
+		Ok(())
+	}
+
 	}
 }

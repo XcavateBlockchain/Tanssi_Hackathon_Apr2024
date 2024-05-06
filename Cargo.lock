@@ -2002,6 +2002,7 @@ dependencies = [
  "sp-debug-derive",
  "sp-genesis-builder",
  "sp-inherents",
+ "sp-keystore",
  "sp-offchain",
  "sp-runtime",
  "sp-session",

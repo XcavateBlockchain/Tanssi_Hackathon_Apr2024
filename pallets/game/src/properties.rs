@@ -2,7 +2,7 @@ use crate::*;
 use frame_support::pallet_prelude::*;
 
 impl<T: Config> Pallet<T> {
-	pub(crate) fn create_test_properties() -> DispatchResult {
+	/* pub(crate) fn create_test_properties() -> DispatchResult {
 		let new_property = PropertyInfoData {
 			id: 1,
 			property_type: "Apartment".as_bytes().to_vec().try_into().unwrap(),
@@ -64,5 +64,5 @@ impl<T: Config> Pallet<T> {
 		TestProperties::<T>::try_append(new_property).map_err(|_| Error::<T>::TooManyTest)?;
 		TestPrices::<T>::insert(4, 500000);
 		Ok(())
-	}
+	} */
 }
