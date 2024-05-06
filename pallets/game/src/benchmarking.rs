@@ -5,8 +5,11 @@ use super::*;
 #[allow(unused)]
 use crate::Pallet as GameModule;
 use frame_benchmarking::v2::*;
+use frame_support::{
+	assert_ok,
+	traits::{OnFinalize, OnInitialize},
+};
 use frame_system::RawOrigin;
-use frame_support::{assert_ok, traits::{OnInitialize, OnFinalize}};
 
 fn create_setup<T: Config>() -> T::AccountId {
 	let caller: T::AccountId = whitelisted_caller();
@@ -16,8 +19,15 @@ fn create_setup<T: Config>() -> T::AccountId {
 }
 
 fn practise_round<T: Config>(caller: T::AccountId, game_id: u32) {
-	assert_ok!(GameModule::<T>::play_game(RawOrigin::Signed(caller.clone()).into(), crate::DifficultyLevel::Practice));
-	assert_ok!(GameModule::<T>::submit_answer(RawOrigin::Signed(caller.clone()).into(), 20, game_id));
+	assert_ok!(GameModule::<T>::play_game(
+		RawOrigin::Signed(caller.clone()).into(),
+		crate::DifficultyLevel::Practice
+	));
+	assert_ok!(GameModule::<T>::submit_answer(
+		RawOrigin::Signed(caller.clone()).into(),
+		20,
+		game_id
+	));
 }
 
 #[benchmarks]
@@ -45,114 +55,148 @@ mod benchmarks {
 		give_points(RawOrigin::Root, caller);
 	}
 
- 	#[benchmark]
+	#[benchmark]
 	fn play_game() {
-		let caller =
-			create_setup::<T>();
+		let caller = create_setup::<T>();
 		current_block::<T>(30u32.into());
 		practise_round::<T>(caller.clone(), 0);
 		#[extrinsic_call]
-		play_game(
-			RawOrigin::Signed(caller),
-			crate::DifficultyLevel::Player
-		);
-	} 
+		play_game(RawOrigin::Signed(caller), crate::DifficultyLevel::Player);
+	}
 
-  	#[benchmark]
+	#[benchmark]
 	fn submit_answer() {
-		let caller =
-			create_setup::<T>();
+		let caller = create_setup::<T>();
 		current_block::<T>(30u32.into());
 		practise_round::<T>(caller.clone(), 0);
-		assert_ok!(GameModule::<T>::play_game(RawOrigin::Signed(caller.clone()).into(), crate::DifficultyLevel::Player));
+		assert_ok!(GameModule::<T>::play_game(
+			RawOrigin::Signed(caller.clone()).into(),
+			crate::DifficultyLevel::Player
+		));
 		#[extrinsic_call]
- 		submit_answer(
-			RawOrigin::Signed(caller),
-			200000,
-			1,
-		); 
-	} 
+		submit_answer(RawOrigin::Signed(caller), 200000, 1);
+	}
 
 	#[benchmark]
 	fn list_nft() {
-		let caller =
-			create_setup::<T>();
+		let caller = create_setup::<T>();
 		current_block::<T>(30u32.into());
 		practise_round::<T>(caller.clone(), 0);
-		assert_ok!(GameModule::<T>::play_game(RawOrigin::Signed(caller.clone()).into(), crate::DifficultyLevel::Player));
-		assert_ok!(GameModule::<T>::submit_answer(RawOrigin::Signed(caller.clone()).into(), 220000, 1));
+		assert_ok!(GameModule::<T>::play_game(
+			RawOrigin::Signed(caller.clone()).into(),
+			crate::DifficultyLevel::Player
+		));
+		assert_ok!(GameModule::<T>::submit_answer(
+			RawOrigin::Signed(caller.clone()).into(),
+			220000,
+			1
+		));
 		#[extrinsic_call]
-		list_nft(
-			RawOrigin::Signed(caller),
-			0.into(),
-			0.into(),
-		); 
-	} 
+		list_nft(RawOrigin::Signed(caller), 0.into(), 0.into());
+	}
 
 	#[benchmark]
 	fn delist_nft() {
-		let caller =
-			create_setup::<T>();
+		let caller = create_setup::<T>();
 		current_block::<T>(30u32.into());
 		practise_round::<T>(caller.clone(), 0);
-		assert_ok!(GameModule::<T>::play_game(RawOrigin::Signed(caller.clone()).into(), crate::DifficultyLevel::Player));
-		assert_ok!(GameModule::<T>::submit_answer(RawOrigin::Signed(caller.clone()).into(), 220000, 1));
-		assert_ok!(GameModule::<T>::list_nft(RawOrigin::Signed(caller.clone()).into(), 0.into(), 0.into()));
+		assert_ok!(GameModule::<T>::play_game(
+			RawOrigin::Signed(caller.clone()).into(),
+			crate::DifficultyLevel::Player
+		));
+		assert_ok!(GameModule::<T>::submit_answer(
+			RawOrigin::Signed(caller.clone()).into(),
+			220000,
+			1
+		));
+		assert_ok!(GameModule::<T>::list_nft(
+			RawOrigin::Signed(caller.clone()).into(),
+			0.into(),
+			0.into()
+		));
 		#[extrinsic_call]
-		delist_nft(
-			RawOrigin::Signed(caller),
-			0,
-		); 
-	}  
+		delist_nft(RawOrigin::Signed(caller), 0);
+	}
 
 	#[benchmark]
 	fn make_offer() {
-		let caller =
-			create_setup::<T>();
+		let caller = create_setup::<T>();
 		current_block::<T>(30u32.into());
 		practise_round::<T>(caller.clone(), 0);
-		assert_ok!(GameModule::<T>::play_game(RawOrigin::Signed(caller.clone()).into(), crate::DifficultyLevel::Player));
-		assert_ok!(GameModule::<T>::submit_answer(RawOrigin::Signed(caller.clone()).into(), 220000, 1));
-		assert_ok!(GameModule::<T>::list_nft(RawOrigin::Signed(caller.clone()).into(), 0.into(), 0.into()));
-		let caller2 =
-			create_setup::<T>();
-		practise_round::<T>(caller2.clone(), 2);
-		assert_ok!(GameModule::<T>::play_game(RawOrigin::Signed(caller.clone()).into(), crate::DifficultyLevel::Player));
-		assert_ok!(GameModule::<T>::submit_answer(RawOrigin::Signed(caller.clone()).into(), 220000, 3));
-		#[extrinsic_call]
-		make_offer(
-			RawOrigin::Signed(caller2),
-			0,
+		assert_ok!(GameModule::<T>::play_game(
+			RawOrigin::Signed(caller.clone()).into(),
+			crate::DifficultyLevel::Player
+		));
+		assert_ok!(GameModule::<T>::submit_answer(
+			RawOrigin::Signed(caller.clone()).into(),
+			220000,
+			1
+		));
+		assert_ok!(GameModule::<T>::list_nft(
+			RawOrigin::Signed(caller.clone()).into(),
 			0.into(),
-			1.into(),
-		); 
-	}  
+			0.into()
+		));
+		let caller2 = create_setup::<T>();
+		practise_round::<T>(caller2.clone(), 2);
+		assert_ok!(GameModule::<T>::play_game(
+			RawOrigin::Signed(caller.clone()).into(),
+			crate::DifficultyLevel::Player
+		));
+		assert_ok!(GameModule::<T>::submit_answer(
+			RawOrigin::Signed(caller.clone()).into(),
+			220000,
+			3
+		));
+		#[extrinsic_call]
+		make_offer(RawOrigin::Signed(caller2), 0, 0.into(), 1.into());
+	}
 
 	#[benchmark]
 	fn handle_offer() {
-		let caller =
-			create_setup::<T>();
+		let caller = create_setup::<T>();
 		current_block::<T>(30u32.into());
 		practise_round::<T>(caller.clone(), 0);
-		assert_ok!(GameModule::<T>::play_game(RawOrigin::Signed(caller.clone()).into(), crate::DifficultyLevel::Player));
-		assert_ok!(GameModule::<T>::submit_answer(RawOrigin::Signed(caller.clone()).into(), 220000, 1));
-		assert_ok!(GameModule::<T>::list_nft(RawOrigin::Signed(caller.clone()).into(), 0.into(), 0.into()));
-		let caller2 =
-			create_setup::<T>();
+		assert_ok!(GameModule::<T>::play_game(
+			RawOrigin::Signed(caller.clone()).into(),
+			crate::DifficultyLevel::Player
+		));
+		assert_ok!(GameModule::<T>::submit_answer(
+			RawOrigin::Signed(caller.clone()).into(),
+			220000,
+			1
+		));
+		assert_ok!(GameModule::<T>::list_nft(
+			RawOrigin::Signed(caller.clone()).into(),
+			0.into(),
+			0.into()
+		));
+		let caller2 = create_setup::<T>();
 		practise_round::<T>(caller2.clone(), 2);
-		assert_ok!(GameModule::<T>::play_game(RawOrigin::Signed(caller2.clone()).into(), crate::DifficultyLevel::Player));
-		assert_ok!(GameModule::<T>::submit_answer(RawOrigin::Signed(caller2.clone()).into(), 220000, 3));
-		assert_eq!(GameModule::<T>::users::<AccountIdOf<T>>(caller2.clone()).unwrap().nfts.xorange, 1);
-		assert_ok!(GameModule::<T>::make_offer(RawOrigin::Signed(caller2.clone()).into(), 0, 0.into(), 1.into()));
+		assert_ok!(GameModule::<T>::play_game(
+			RawOrigin::Signed(caller2.clone()).into(),
+			crate::DifficultyLevel::Player
+		));
+		assert_ok!(GameModule::<T>::submit_answer(
+			RawOrigin::Signed(caller2.clone()).into(),
+			220000,
+			3
+		));
+		assert_eq!(
+			GameModule::<T>::users::<AccountIdOf<T>>(caller2.clone()).unwrap().nfts.xorange,
+			1
+		);
+		assert_ok!(GameModule::<T>::make_offer(
+			RawOrigin::Signed(caller2.clone()).into(),
+			0,
+			0.into(),
+			1.into()
+		));
 
 		#[extrinsic_call]
-		handle_offer(
-			RawOrigin::Signed(caller2),
-			0,
-			crate::Offer::Accept,
-		); 
-	}  
- 
+		handle_offer(RawOrigin::Signed(caller2), 0, crate::Offer::Accept);
+	}
+
 	impl_benchmark_test_suite!(GameModule, crate::mock::new_test_ext(), crate::mock::Test);
 }
 

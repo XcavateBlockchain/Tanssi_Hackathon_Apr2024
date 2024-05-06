@@ -221,7 +221,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("container-chain-template"),
     impl_name: create_runtime_str!("container-chain-template"),
     authoring_version: 1,
-    spec_version: 700,
+    spec_version: 701,
     impl_version: 0,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -702,7 +702,6 @@ impl sp_core::Get<u32> for MaxProperties {
 parameter_types! {
 	pub const GamePalletId: PalletId = PalletId(*b"py/rlxdl");
 	pub const MaxOngoingGame: u32 = 200;
-    pub const UnsignedPriority: u64 = 1 << 20;
     pub const LeaderLimit: u32 = 10;
 }
 
@@ -719,11 +718,6 @@ impl pallet_game::Config for Runtime {
 	type GameRandomness = RandomnessCollectiveFlip;
 	type StringLimit = StringLimit;
     type LeaderboardLimit = LeaderLimit;
-	type AuthorityId = pallet_game::crypto::TestAuthId;
-    type GracePeriod = ConstU32<5>;
-    type UnsignedInterval = ConstU32<2>;
-    type UnsignedPriority = UnsignedPriority;
-    type MaxPrices = ConstU32<64>;
 }
 
 impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
