@@ -702,12 +702,15 @@ impl sp_core::Get<u32> for MaxProperties {
 parameter_types! {
 	pub const GamePalletId: PalletId = PalletId(*b"py/rlxdl");
 	pub const MaxOngoingGame: u32 = 200;
-    pub const LeaderLimit: u32 = 10;
+	pub const LeaderLimit: u32 = 10;
+	pub const MaxAdmin: u32 = 10;
+	pub const RequestLimits: BlockNumber = 100800;
 }
 
 /// Configure the pallet-game in pallets/game.
 impl pallet_game::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
 	type WeightInfo = pallet_game::weights::SubstrateWeight<Runtime>;
 	type GameOrigin = EnsureRoot<Self::AccountId>;
 	type CollectionId = u32;
@@ -717,7 +720,9 @@ impl pallet_game::Config for Runtime {
 	type MaxOngoingGames = MaxOngoingGame;
 	type GameRandomness = RandomnessCollectiveFlip;
 	type StringLimit = StringLimit;
-    type LeaderboardLimit = LeaderLimit;
+	type LeaderboardLimit = LeaderLimit;
+	type MaxAdmins = MaxAdmin;
+	type RequestLimit = RequestLimits;
 }
 
 impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
