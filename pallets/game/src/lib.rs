@@ -15,8 +15,8 @@ mod tests;
 mod benchmarking;
 pub mod weights;
 pub use weights::*;
-pub mod properties;
 pub mod functions;
+pub mod properties;
 pub mod types;
 
 type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
@@ -57,9 +57,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config:
-		frame_system::Config + pallet_nfts::Config
-	//+ pallet_babe::Config
+	pub trait Config: frame_system::Config + pallet_nfts::Config //+ pallet_babe::Config
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -211,15 +209,11 @@ pub mod pallet {
 	pub type TestProperties<T: Config> =
 		StorageValue<_, BoundedVec<PropertyInfoData<T>, T::MaxProperty>, ValueQuery>;
 
-	/// Test for properties.
-	#[pallet::storage]
-	#[pallet::getter(fn test_prices)]
-	pub type TestPrices<T: Config> = StorageMap<_, Blake2_128Concat, u32, u32, OptionQuery>;
-
 	/// Vector of admins who can register users.
 	#[pallet::storage]
 	#[pallet::getter(fn admins)]
-	pub type Admins<T: Config> = StorageValue<_, BoundedVec<AccountIdOf<T>, T::MaxAdmins>, ValueQuery>;
+	pub type Admins<T: Config> =
+		StorageValue<_, BoundedVec<AccountIdOf<T>, T::MaxAdmins>, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -229,7 +223,9 @@ pub mod pallet {
 		/// A game has started.
 		GameStarted { player: AccountIdOf<T>, game_id: u32 },
 		/// An answer has been submitted.
-		AnswerSubmitted { player: AccountIdOf<T>, game_id: u32 },
+		AnswerSubmitted { player: AccountIdOf<T>, game_id: u32, guess: u32 },
+		/// The result has been checked.
+		ResultChecked { game_id: u32 },
 		/// A nft has been listed.
 		NftListed { owner: AccountIdOf<T>, collection_id: CollectionId<T>, item_id: ItemId<T> },
 		/// A nft has been delisted.
@@ -301,6 +297,8 @@ pub mod pallet {
 		TooManyAdmins,
 		/// The user has to wait to request token.
 		CantRequestToken,
+		/// There has been no guess from the player.
+		NoGuess,
 	}
 
 	#[pallet::hooks]
@@ -314,7 +312,9 @@ pub mod pallet {
 				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 1));
 				let game_info = <GameInfo<T>>::take(index);
 				if let Some(game_info) = game_info {
-					let _ = Self::no_answer_result(game_info);
+					if game_info.guess.is_none() {
+						let _ = Self::no_answer_result(game_info);
+					}
 				}
 			});
 			weight
@@ -380,7 +380,8 @@ pub mod pallet {
 			ensure!(Self::admins().contains(&signer), Error::<T>::NoPermission);
 			ensure!(Self::users(player.clone()).is_none(), Error::<T>::PlayerAlreadyRegistered);
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
-			let next_request = current_block_number.saturating_add(<T as Config>::RequestLimit::get());
+			let next_request =
+				current_block_number.saturating_add(<T as Config>::RequestLimit::get());
 			let user = User {
 				points: 50,
 				wins: Default::default(),
@@ -390,8 +391,12 @@ pub mod pallet {
 				next_token_request: next_request,
 				nfts: CollectedColors::default(),
 			};
-			<T as pallet::Config>::Currency::make_free_balance_be(&player, 10u32.try_into().map_err(|_| Error::<T>::ConversionError)?);
+			<T as pallet::Config>::Currency::make_free_balance_be(
+				&player,
+				10u32.try_into().map_err(|_| Error::<T>::ConversionError)?,
+			);
 			Users::<T>::insert(player.clone(), user);
+			frame_system::Pallet::<T>::inc_providers(&player);
 			Self::deposit_event(Event::<T>::NewPlayerRegistered { player });
 			Ok(())
 		}
@@ -425,6 +430,30 @@ pub mod pallet {
 		/// Emits `GameStarted` event when succesfful.
 		#[pallet::call_index(3)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::play_game())]
+		#[pallet::feeless_if(|origin: &OriginFor<T>, game_type: &DifficultyLevel| -> bool {
+			if let Ok(signer) = ensure_signed(origin.clone()) {
+				match game_type {
+					DifficultyLevel::Pro => {
+						if let Some(user) = Users::<T>::get(&signer) {
+							if user.points >= 50 {
+								return true;
+							}
+						}
+					},
+					DifficultyLevel::Player => {
+						if let Some(user) = Users::<T>::get(&signer) {
+							if user.points >= 25 {
+								return true;
+							}
+						}
+					},
+					DifficultyLevel::Practice => {
+						return true;
+					}
+				}
+			}
+			false
+		})]
 		pub fn play_game(origin: OriginFor<T>, game_type: DifficultyLevel) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
 			Self::check_enough_points(signer.clone(), game_type.clone())?;
@@ -432,7 +461,8 @@ pub mod pallet {
 			let mut user = Self::users(signer.clone()).ok_or(Error::<T>::UserNotRegistered)?;
 			if Self::current_round() != user.last_played_round {
 				user.nfts = Default::default();
-				user.last_played_round = user.last_played_round.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
+				user.last_played_round =
+					user.last_played_round.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 				Users::<T>::insert(signer.clone(), user);
 			}
 			let game_id = Self::game_id();
@@ -465,11 +495,13 @@ pub mod pallet {
 			let u32_value = u32::from_le_bytes(
 				hashi.as_ref()[4..8].try_into().map_err(|_| Error::<T>::ConversionError)?,
 			);
-			let random_number = u32_value as usize %
-				Self::test_properties()
-					.len();
+			let random_number = u32_value as usize % Self::test_properties().len();
 			let property = Self::test_properties()[random_number].clone();
-			let game_datas = GameData { difficulty: game_type, player: signer.clone(), property };
+			let game_datas =
+				GameData { difficulty: game_type, player: signer.clone(), property, guess: None };
+			let mut properties = TestProperties::<T>::take();
+			properties.retain(|property| property.id as usize != random_number);
+			TestProperties::<T>::put(properties);
 			GameInfo::<T>::insert(game_id, game_datas);
 			let next_game_id = game_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 			GameId::<T>::put(next_game_id);
@@ -488,22 +520,60 @@ pub mod pallet {
 		/// Emits `AnswerSubmitted` event when succesfful.
 		#[pallet::call_index(4)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::submit_answer())]
+		#[pallet::feeless_if(|origin: &OriginFor<T>, guess: &u32, game_id: &u32| -> bool {
+			if let Ok(signer) = ensure_signed(origin.clone()) {
+				if let Some(game_info) = GameInfo::<T>::get(*game_id) {
+					if signer == game_info.player {
+						return true;
+					}
+				}
+			}
+			false
+		})]
 		pub fn submit_answer(origin: OriginFor<T>, guess: u32, game_id: u32) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
-			let game_info = Self::game_info(game_id).ok_or(Error::<T>::NoActiveGame)?;
+			let mut game_info = Self::game_info(game_id).ok_or(Error::<T>::NoActiveGame)?;
 			ensure!(signer == game_info.player, Error::<T>::NoThePlayer);
-			let property_id = game_info.property.id;
-			let result: u32 = Self::test_prices(property_id).ok_or(Error::<T>::NoProperty)?;
-			let difference_value = ((result as i32)
+			game_info.guess = Some(guess);
+			GameInfo::<T>::insert(game_id, game_info);
+			Self::deposit_event(Event::<T>::AnswerSubmitted { player: signer, game_id, guess });
+			Ok(())
+		}
+
+		/// Checks the answer of the player and handles rewards accordingly.
+		///
+		/// The origin must be root.
+		///
+		/// Parameters:
+		/// - `guess`: The answer of the player.
+		/// - `game_id`: The id of the game that the result should be compared to.
+		/// - `price`: The price of the property.
+		/// - `secret`: The secret to decrypt the price and property data.
+		///
+		/// Emits `ResultChecked` event when succesfful.
+		#[pallet::call_index(15)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::submit_answer())]
+		pub fn check_result(
+			origin: OriginFor<T>,
+			guess: u32,
+			game_id: u32,
+			price: u32,
+			secret: BoundedVec<u8, <T as Config>::StringLimit>,
+		) -> DispatchResult {
+			T::GameOrigin::ensure_origin(origin)?;
+			let difference_value = ((price as i32)
 				.checked_sub(guess as i32)
 				.ok_or(Error::<T>::ArithmeticUnderflow)?)
 			.checked_mul(1000)
 			.ok_or(Error::<T>::MultiplyError)?
-			.checked_div(result as i32)
+			.checked_div(price as i32)
 			.ok_or(Error::<T>::DivisionError)?
 			.abs();
-			Self::check_result(difference_value.try_into().map_err(|_| Error::<T>::ConversionError)?, game_id)?;
-			Self::deposit_event(Event::<T>::AnswerSubmitted { player: signer, game_id });
+			Self::do_check_result(
+				difference_value.try_into().map_err(|_| Error::<T>::ConversionError)?,
+				game_id,
+			)?;
+			Self::deposit_event(Event::<T>::ResultChecked { game_id });
 			Ok(())
 		}
 
@@ -745,10 +815,10 @@ pub mod pallet {
 		/// - `price`: The price of the property that will be added.
 		#[pallet::call_index(10)]
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_property())]
-		pub fn add_property(origin: OriginFor<T>, property: PropertyInfoData<T>, price: u32) -> DispatchResult {
+		pub fn add_property(origin: OriginFor<T>, property: PropertyInfoData<T>) -> DispatchResult {
 			T::GameOrigin::ensure_origin(origin)?;
-			TestProperties::<T>::try_append(property.clone()).map_err(|_| Error::<T>::TooManyTest)?;
-			TestPrices::<T>::insert(property.id, price);
+			TestProperties::<T>::try_append(property.clone())
+				.map_err(|_| Error::<T>::TooManyTest)?;
 			Ok(())
 		}
 
@@ -765,7 +835,6 @@ pub mod pallet {
 			let mut properties = TestProperties::<T>::take();
 			properties.retain(|property| property.id != id);
 			TestProperties::<T>::put(properties);
-			TestPrices::<T>::take(id);
 			Ok(())
 		}
 
@@ -781,12 +850,8 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_to_admins())]
 		pub fn add_to_admins(origin: OriginFor<T>, new_admin: AccountIdOf<T>) -> DispatchResult {
 			T::GameOrigin::ensure_origin(origin)?;
-			ensure!(
-				!Self::admins().contains(&new_admin),
-				Error::<T>::AccountAlreadyAdmin,
-			);
-			Admins::<T>::try_append(new_admin.clone())
-			.map_err(|_| Error::<T>::TooManyAdmins)?;
+			ensure!(!Self::admins().contains(&new_admin), Error::<T>::AccountAlreadyAdmin,);
+			Admins::<T>::try_append(new_admin.clone()).map_err(|_| Error::<T>::TooManyAdmins)?;
 			Self::deposit_event(Event::<T>::NewAdminAdded { new_admin });
 			Ok(())
 		}
@@ -824,9 +889,13 @@ pub mod pallet {
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			let mut user = Self::users(signer.clone()).ok_or(Error::<T>::UserNotRegistered)?;
 			ensure!(user.next_token_request < current_block_number, Error::<T>::CantRequestToken);
-			let next_request = current_block_number.saturating_add(<T as Config>::RequestLimit::get());
+			let next_request =
+				current_block_number.saturating_add(<T as Config>::RequestLimit::get());
 			user.next_token_request = next_request;
-			<T as pallet::Config>::Currency::make_free_balance_be(&signer, 10u32.try_into().map_err(|_| Error::<T>::ConversionError)?);
+			<T as pallet::Config>::Currency::make_free_balance_be(
+				&signer,
+				10u32.try_into().map_err(|_| Error::<T>::ConversionError)?,
+			);
 			Users::<T>::insert(signer.clone(), user);
 			Self::deposit_event(Event::<T>::TokenReceived { player: signer });
 			Ok(())

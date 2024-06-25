@@ -158,9 +158,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut test = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
 	pallet_balances::GenesisConfig::<Test> {
-		balances: vec![
-			(GameModule::account_id(), 1_000_000),
-		],
+		balances: vec![(GameModule::account_id(), 1_000_000)],
 	}
 	.assimilate_storage(&mut test)
 	.unwrap();

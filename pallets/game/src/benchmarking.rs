@@ -155,7 +155,10 @@ mod benchmarks {
 		));
 		let caller2: T::AccountId = account("caller2", 0, 0);
 		let admin: T::AccountId = account("admin", 0, 0);
-		assert_ok!(GameModule::<T>::register_user(RawOrigin::Signed(admin).into(), caller2.clone()));
+		assert_ok!(GameModule::<T>::register_user(
+			RawOrigin::Signed(admin).into(),
+			caller2.clone()
+		));
 		practise_round::<T>(caller2.clone(), 2);
 		assert_ok!(GameModule::<T>::play_game(
 			RawOrigin::Signed(caller2.clone()).into(),
@@ -193,7 +196,10 @@ mod benchmarks {
 		));
 		let caller2: T::AccountId = account("caller2", 0, 0);
 		let admin: T::AccountId = account("admin", 0, 0);
-		assert_ok!(GameModule::<T>::register_user(RawOrigin::Signed(admin).into(), caller2.clone()));
+		assert_ok!(GameModule::<T>::register_user(
+			RawOrigin::Signed(admin).into(),
+			caller2.clone()
+		));
 		practise_round::<T>(caller2.clone(), 2);
 		assert_ok!(GameModule::<T>::play_game(
 			RawOrigin::Signed(caller2.clone()).into(),

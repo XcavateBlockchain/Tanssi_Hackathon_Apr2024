@@ -22,18 +22,16 @@ serde = { version = "1.0.197", features = ["derive"], optional = true }
 frame-benchmarking = { workspace = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
-sp-io = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
-sp-core = { workspace = true, default-features = false }
-sp-runtime = { workspace = true, default-features = false }
 
 pallet-nfts = {  workspace = true }
 enumflags2 = { version = "0.7.7" }
 
-log = { version = "0.4.21", default-features = false }
-lite-json = { version = "0.2.0", default-features = false }
-
 [dev-dependencies]
+sp-io = { workspace = true, default-features = false }
+sp-core = { workspace = true, default-features = false }
+sp-runtime = { workspace = true, default-features = false }
+
 pallet-insecure-randomness-collective-flip = {  workspace = true }
 pallet-balances = { workspace = true }
 
@@ -49,8 +47,6 @@ std = [
 	"pallet-nfts/std",
 	"pallet-balances/std",
 	"sp-std/std",
-	"log/std",
-	"lite-json/std",
 ]
 runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
 try-runtime = ["frame-support/try-runtime"]
