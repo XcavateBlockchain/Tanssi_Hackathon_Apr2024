@@ -30,6 +30,13 @@ fn practise_round<T: Config>(caller: T::AccountId, game_id: u32) {
 		20,
 		game_id
 	));
+	assert_ok!(GameModule::<T>::check_result(
+		RawOrigin::Root.into(),
+		20,
+		game_id,
+		20,
+		"test".as_bytes().to_vec().try_into().unwrap(),
+	));
 }
 
 #[benchmarks]
@@ -74,7 +81,7 @@ mod benchmarks {
 		assert_eq!(GameModule::<T>::game_info(1).unwrap().player, caller);
 	}
 
-	#[benchmark]
+ 	#[benchmark]
 	fn submit_answer() {
 		let caller = create_setup::<T>();
 		current_block::<T>(30u32.into());
@@ -86,6 +93,13 @@ mod benchmarks {
 		#[extrinsic_call]
 		submit_answer(RawOrigin::Signed(caller.clone()), 220000, 1);
 
+		assert_ok!(GameModule::<T>::check_result(
+			RawOrigin::Root.into(),
+			220000,
+			1,
+			220000,
+			"test".as_bytes().to_vec().try_into().unwrap(),
+		));
 		assert_eq!(GameModule::<T>::users::<AccountIdOf<T>>(caller).unwrap().nfts.xorange, 1);
 	}
 
@@ -102,6 +116,13 @@ mod benchmarks {
 			RawOrigin::Signed(caller.clone()).into(),
 			220000,
 			1
+		));
+		assert_ok!(GameModule::<T>::check_result(
+			RawOrigin::Root.into(),
+			220000,
+			1,
+			220000,
+			"test".as_bytes().to_vec().try_into().unwrap(),
 		));
 		#[extrinsic_call]
 		list_nft(RawOrigin::Signed(caller.clone()), 0.into(), 0.into());
@@ -122,6 +143,13 @@ mod benchmarks {
 			RawOrigin::Signed(caller.clone()).into(),
 			220000,
 			1
+		));
+		assert_ok!(GameModule::<T>::check_result(
+			RawOrigin::Root.into(),
+			220000,
+			1,
+			220000,
+			"test".as_bytes().to_vec().try_into().unwrap(),
 		));
 		assert_ok!(GameModule::<T>::list_nft(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -148,6 +176,13 @@ mod benchmarks {
 			220000,
 			1
 		));
+		assert_ok!(GameModule::<T>::check_result(
+			RawOrigin::Root.into(),
+			220000,
+			1,
+			220000,
+			"test".as_bytes().to_vec().try_into().unwrap(),
+		));
 		assert_ok!(GameModule::<T>::list_nft(
 			RawOrigin::Signed(caller.clone()).into(),
 			0.into(),
@@ -168,6 +203,13 @@ mod benchmarks {
 			RawOrigin::Signed(caller2.clone()).into(),
 			220000,
 			3
+		));
+		assert_ok!(GameModule::<T>::check_result(
+			RawOrigin::Root.into(),
+			220000,
+			3,
+			220000,
+			"test".as_bytes().to_vec().try_into().unwrap(),
 		));
 		#[extrinsic_call]
 		make_offer(RawOrigin::Signed(caller2.clone()), 0, 0.into(), 1.into());
@@ -189,6 +231,13 @@ mod benchmarks {
 			220000,
 			1
 		));
+		assert_ok!(GameModule::<T>::check_result(
+			RawOrigin::Root.into(),
+			220000,
+			1,
+			220000,
+			"test".as_bytes().to_vec().try_into().unwrap(),
+		));
 		assert_ok!(GameModule::<T>::list_nft(
 			RawOrigin::Signed(caller.clone()).into(),
 			0.into(),
@@ -209,6 +258,13 @@ mod benchmarks {
 			RawOrigin::Signed(caller2.clone()).into(),
 			220000,
 			3
+		));
+		assert_ok!(GameModule::<T>::check_result(
+			RawOrigin::Root.into(),
+			220000,
+			3,
+			220000,
+			"test".as_bytes().to_vec().try_into().unwrap(),
 		));
 		assert_eq!(
 			GameModule::<T>::users::<AccountIdOf<T>>(caller2.clone()).unwrap().nfts.xorange,
@@ -232,20 +288,14 @@ mod benchmarks {
 	fn add_property() {
 		assert_ok!(GameModule::<T>::setup_game(RawOrigin::Root.into()));
 		let new_property = PropertyInfoData {
-			id: 147229391,
-			bedrooms: 2,
-			bathrooms: 1,
-			summary: "Superb 2 double bedroom ground floor purpose-built apartment with sole use of garden. Directly opposite Hackney Downs Park, within walking distance of Clapton, Hackney Downs & Rectory Rd Stations. Benefitting from; 2 double bedrooms, fitted kitchen/diner, modern shower/WC, separate lounge with di...".as_bytes().to_vec().try_into().unwrap(),
-			property_sub_type: "Flat".as_bytes().to_vec().try_into().unwrap(),
-			first_visible_date: "2024-04-24T16:39:27Z".as_bytes().to_vec().try_into().unwrap(),
-			display_size: "".as_bytes().to_vec().try_into().unwrap(),
-			display_address: "St Peters Street, Islington".as_bytes().to_vec().try_into().unwrap(),
-			property_images1: "https://media.rightmove.co.uk/dir/crop/10:9-16:9/56k/55489/146480642/55489_2291824_IMG_00_0000_max_476x317.jpeg".as_bytes().to_vec().try_into().unwrap(),
-			};
+			id: 147031382,
+			data: "nfdjakl;fueif;janf,dnfm,dhfhfdksks".as_bytes().to_vec().try_into().unwrap(),
+			price: "kkjfkdjdkdjdkdjdk".as_bytes().to_vec().try_into().unwrap(),
+		};
 		#[extrinsic_call]
-		add_property(RawOrigin::Root, new_property, 200000);
+		add_property(RawOrigin::Root, new_property);
 
-		assert_eq!(GameModule::<T>::test_properties().len(), 5);
+		assert_eq!(GameModule::<T>::game_properties().len(), 5);
 	}
 
 	#[benchmark]
@@ -254,7 +304,7 @@ mod benchmarks {
 		#[extrinsic_call]
 		remove_property(RawOrigin::Root, 146480642);
 
-		assert_eq!(GameModule::<T>::test_properties().len(), 3);
+		assert_eq!(GameModule::<T>::game_properties().len(), 3);
 	}
 
 	#[benchmark]

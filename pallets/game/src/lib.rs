@@ -205,8 +205,8 @@ pub mod pallet {
 
 	/// A List of test properties
 	#[pallet::storage]
-	#[pallet::getter(fn test_properties)]
-	pub type TestProperties<T: Config> =
+	#[pallet::getter(fn game_properties)]
+	pub type GameProperties<T: Config> =
 		StorageValue<_, BoundedVec<PropertyInfoData<T>, T::MaxProperty>, ValueQuery>;
 
 	/// Vector of admins who can register users.
@@ -314,6 +314,8 @@ pub mod pallet {
 				if let Some(game_info) = game_info {
 					if game_info.guess.is_none() {
 						let _ = Self::no_answer_result(game_info);
+					} else {
+						GameInfo::<T>::insert(index, game_info);
 					}
 				}
 			});
@@ -357,7 +359,7 @@ pub mod pallet {
 				let color = NftColor::from_index(x).ok_or(Error::<T>::InvalidIndex)?;
 				CollectionColor::<T>::insert(collection_id, color);
 			}
-			Self::create_test_properties()?;
+			Self::create_game_properties()?;
 			let mut round = Self::current_round();
 			round = round.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 			CurrentRound::<T>::put(round);
@@ -495,13 +497,13 @@ pub mod pallet {
 			let u32_value = u32::from_le_bytes(
 				hashi.as_ref()[4..8].try_into().map_err(|_| Error::<T>::ConversionError)?,
 			);
-			let random_number = u32_value as usize % Self::test_properties().len();
-			let property = Self::test_properties()[random_number].clone();
+			let random_number = u32_value as usize % Self::game_properties().len();
+			let property = Self::game_properties()[random_number].clone();
 			let game_datas =
 				GameData { difficulty: game_type, player: signer.clone(), property, guess: None };
-			let mut properties = TestProperties::<T>::take();
+			let mut properties = GameProperties::<T>::take();
 			properties.retain(|property| property.id as usize != random_number);
-			TestProperties::<T>::put(properties);
+			GameProperties::<T>::put(properties);
 			GameInfo::<T>::insert(game_id, game_datas);
 			let next_game_id = game_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 			GameId::<T>::put(next_game_id);
@@ -817,7 +819,7 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::add_property())]
 		pub fn add_property(origin: OriginFor<T>, property: PropertyInfoData<T>) -> DispatchResult {
 			T::GameOrigin::ensure_origin(origin)?;
-			TestProperties::<T>::try_append(property.clone())
+			GameProperties::<T>::try_append(property.clone())
 				.map_err(|_| Error::<T>::TooManyTest)?;
 			Ok(())
 		}
@@ -832,9 +834,9 @@ pub mod pallet {
 		#[pallet::weight(<T as pallet::Config>::WeightInfo::remove_property())]
 		pub fn remove_property(origin: OriginFor<T>, id: u32) -> DispatchResult {
 			T::GameOrigin::ensure_origin(origin)?;
-			let mut properties = TestProperties::<T>::take();
+			let mut properties = GameProperties::<T>::take();
 			properties.retain(|property| property.id != id);
-			TestProperties::<T>::put(properties);
+			GameProperties::<T>::put(properties);
 			Ok(())
 		}
 

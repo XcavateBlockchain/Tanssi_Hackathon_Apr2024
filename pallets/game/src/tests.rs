@@ -93,7 +93,7 @@ fn play_game_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -115,7 +115,7 @@ fn play_game_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_noop!(
 			GameModule::play_game(
 				RuntimeOrigin::signed([0; 32].into()),
@@ -150,7 +150,7 @@ fn play_game_fails_not_enough_points() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -174,7 +174,7 @@ fn submit_answer_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -225,7 +225,7 @@ fn leaderboard_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -303,7 +303,7 @@ fn submit_answer_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_noop!(
 			GameModule::submit_answer(RuntimeOrigin::signed([0; 32].into()), 223_000, 0),
 			Error::<Test>::NoActiveGame
@@ -316,7 +316,7 @@ fn transfer_of_nft_does_not_work() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -362,7 +362,7 @@ fn list_nft_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -398,7 +398,7 @@ fn list_nft_doesnt_work() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -435,7 +435,7 @@ fn delist_nft_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -485,7 +485,7 @@ fn delist_nft_doesnt_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -525,7 +525,7 @@ fn make_offer_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -584,7 +584,7 @@ fn make_offer_doesnt_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -609,7 +609,7 @@ fn withdraw_offer_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -670,7 +670,7 @@ fn withdraw_offer_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -737,7 +737,7 @@ fn handle_offer_accept_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -869,7 +869,7 @@ fn handle_offer_reject_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -949,7 +949,7 @@ fn handle_offer_doesnt_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -1014,7 +1014,7 @@ fn play_multiple_rounds_works() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
@@ -1063,7 +1063,7 @@ fn add_property_works() {
 			price: "kkjfkdjdkdjdkdjdk".as_bytes().to_vec().try_into().unwrap(),
 		};
 		assert_ok!(GameModule::add_property(RuntimeOrigin::root(), new_property));
-		assert_eq!(GameModule::test_properties().len(), 5);
+		assert_eq!(GameModule::game_properties().len(), 5);
 	});
 }
 
@@ -1073,7 +1073,7 @@ fn remove_property_works() {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
 		assert_ok!(GameModule::remove_property(RuntimeOrigin::root(), 146480642));
-		assert_eq!(GameModule::test_properties().len(), 3);
+		assert_eq!(GameModule::game_properties().len(), 3);
 	});
 }
 
@@ -1119,7 +1119,7 @@ fn check_result_fails() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(GameModule::setup_game(RuntimeOrigin::root()));
-		assert_eq!(GameModule::test_properties().len(), 4);
+		assert_eq!(GameModule::game_properties().len(), 4);
 		assert_ok!(GameModule::add_to_admins(RuntimeOrigin::root(), [4; 32].into()));
 		assert_ok!(GameModule::register_user(
 			RuntimeOrigin::signed([4; 32].into()),
