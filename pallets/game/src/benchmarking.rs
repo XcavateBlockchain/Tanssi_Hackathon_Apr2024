@@ -65,7 +65,7 @@ mod benchmarks {
 	fn give_points() {
 		let caller = create_setup::<T>();
 		#[extrinsic_call]
-		give_points(RawOrigin::Root, caller.clone());
+		give_points(RawOrigin::Root, caller.clone(), 100);
 
 		assert_eq!(GameModule::<T>::users(caller).unwrap().points, 150);
 	}
@@ -81,7 +81,7 @@ mod benchmarks {
 		assert_eq!(GameModule::<T>::game_info(1).unwrap().player, caller);
 	}
 
- 	#[benchmark]
+	#[benchmark]
 	fn submit_answer() {
 		let caller = create_setup::<T>();
 		current_block::<T>(30u32.into());
@@ -100,6 +100,32 @@ mod benchmarks {
 			220000,
 			"test".as_bytes().to_vec().try_into().unwrap(),
 		));
+		assert_eq!(GameModule::<T>::users::<AccountIdOf<T>>(caller).unwrap().nfts.xorange, 1);
+	}
+
+	#[benchmark]
+	fn check_result() {
+		let caller = create_setup::<T>();
+		current_block::<T>(30u32.into());
+		practise_round::<T>(caller.clone(), 0);
+		assert_ok!(GameModule::<T>::play_game(
+			RawOrigin::Signed(caller.clone()).into(),
+			crate::DifficultyLevel::Player
+		));
+		assert_ok!(GameModule::<T>::submit_answer(
+			RawOrigin::Signed(caller.clone()).into(),
+			220000,
+			1
+		));
+		#[extrinsic_call]
+		check_result(
+			RawOrigin::Root,
+			220000,
+			1,
+			220000,
+			"test".as_bytes().to_vec().try_into().unwrap(),
+		);
+
 		assert_eq!(GameModule::<T>::users::<AccountIdOf<T>>(caller).unwrap().nfts.xorange, 1);
 	}
 

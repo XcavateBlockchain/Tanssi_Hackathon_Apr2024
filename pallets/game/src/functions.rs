@@ -45,7 +45,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	/// checks the answer and distributes the rewards accordingly.
-	pub fn do_check_result(difference: u16, game_id: u32) -> DispatchResult {
+	pub fn do_check_result(difference: u16, game_id: u32, secret: BoundedVec<u8, <T as Config>::StringLimit> ) -> DispatchResult {
 		let game_info = GameInfo::<T>::take(game_id).ok_or(Error::<T>::NoActiveGame)?;
 		ensure!(game_info.guess.is_some(), Error::<T>::NoGuess);
 		if game_info.difficulty == DifficultyLevel::Pro {
@@ -63,7 +63,7 @@ impl<T: Config> Pallet<T> {
 						)
 						.ok_or(Error::<T>::ArithmeticOverflow)?;
 					let collection_id: <T as pallet::Config>::CollectionId = random_number.into();
-					let next_item_id = Self::next_color_id(collection_id);
+					let next_item_id = NextColorId::<T>::get(collection_id);
 					let item_id: ItemId<T> = next_item_id.into();
 					let next_item_id =
 						next_item_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
@@ -94,6 +94,7 @@ impl<T: Config> Pallet<T> {
 					if user.has_four_of_all_colors() {
 						Self::end_game(game_info.player.clone())?;
 					}
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points, won: true });
 				},
 				11..=30 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -101,6 +102,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_add(50).ok_or(Error::<T>::ArithmeticOverflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 50, won: true });
 				},
 				31..=50 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -108,6 +110,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_add(30).ok_or(Error::<T>::ArithmeticOverflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 30, won: true });
 				},
 				51..=100 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -115,6 +118,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_add(10).ok_or(Error::<T>::ArithmeticOverflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 10, won: true });
 				},
 				101..=150 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -122,6 +126,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_sub(10).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 10, won: false });
 				},
 				151..=200 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -129,6 +134,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_sub(20).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 20, won: false });
 				},
 				201..=250 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -136,6 +142,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_sub(30).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 30, won: false });
 				},
 				251..=300 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -143,6 +150,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_sub(40).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 40, won: false });
 				},
 				_ => {
 					let mut user = Self::users(game_info.player.clone())
@@ -150,6 +158,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_sub(50).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 50, won: false });
 				},
 			}
 		} else if game_info.difficulty == DifficultyLevel::Player {
@@ -167,7 +176,7 @@ impl<T: Config> Pallet<T> {
 						)
 						.ok_or(Error::<T>::ArithmeticOverflow)?;
 					let collection_id: <T as pallet::Config>::CollectionId = random_number.into();
-					let next_item_id = Self::next_color_id(collection_id);
+					let next_item_id = NextColorId::<T>::get(collection_id);
 					let item_id: ItemId<T> = next_item_id.into();
 					let next_item_id =
 						next_item_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
@@ -198,6 +207,7 @@ impl<T: Config> Pallet<T> {
 					if user.has_four_of_all_colors() {
 						Self::end_game(game_info.player.clone())?;
 					}
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points, won: true });
 				},
 				11..=30 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -205,6 +215,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_add(25).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 25, won: true });
 				},
 				31..=50 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -212,6 +223,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_add(15).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 15, won: true });
 				},
 				51..=100 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -219,6 +231,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_add(5).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 5, won: true });
 				},
 				101..=150 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -226,6 +239,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_sub(5).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 5, won: false });
 				},
 				151..=200 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -233,6 +247,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_sub(10).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 10, won: false });
 				},
 				201..=250 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -240,6 +255,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_sub(15).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 15, won: false });
 				},
 				251..=300 => {
 					let mut user = Self::users(game_info.player.clone())
@@ -247,6 +263,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_sub(20).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 20, won: false });
 				},
 				_ => {
 					let mut user = Self::users(game_info.player.clone())
@@ -254,6 +271,7 @@ impl<T: Config> Pallet<T> {
 					user.points =
 						user.points.checked_sub(25).ok_or(Error::<T>::ArithmeticUnderflow)?;
 					Users::<T>::insert(game_info.player.clone(), user);
+					Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 25, won: false });
 				},
 			}
 		} else {
@@ -263,6 +281,7 @@ impl<T: Config> Pallet<T> {
 			user.practise_rounds =
 				user.practise_rounds.checked_add(1).ok_or(Error::<T>::ArithmeticUnderflow)?;
 			Users::<T>::insert(game_info.player.clone(), user);
+			Self::deposit_event(Event::<T>::ResultChecked { game_id, secret, points: 5, won: true });
 		}
 		let user = Self::users(game_info.player.clone()).ok_or(Error::<T>::UserNotRegistered)?;
 		Self::update_leaderboard(game_info.player, user.points)?;
@@ -320,17 +339,19 @@ impl<T: Config> Pallet<T> {
 	}
 
 	/// Handles the case if the player did not answer on time.
-	pub fn no_answer_result(game_info: GameData<T>) -> DispatchResult {
+	pub fn no_answer_result(game_info: GameData<T>, game_id: u32) -> DispatchResult {
 		if game_info.difficulty == DifficultyLevel::Pro {
 			let mut user =
 				Self::users(game_info.player.clone()).ok_or(Error::<T>::UserNotRegistered)?;
 			user.points = user.points.checked_sub(50).ok_or(Error::<T>::ArithmeticUnderflow)?;
 			Users::<T>::insert(game_info.player.clone(), user);
+			Self::deposit_event(Event::<T>::NoAnswer { game_id, points: 50 });
 		} else if game_info.difficulty == DifficultyLevel::Player {
 			let mut user =
 				Self::users(game_info.player.clone()).ok_or(Error::<T>::UserNotRegistered)?;
 			user.points = user.points.checked_sub(25).ok_or(Error::<T>::ArithmeticUnderflow)?;
 			Users::<T>::insert(game_info.player.clone(), user);
+			Self::deposit_event(Event::<T>::NoAnswer { game_id, points: 25 });
 		}
 		Ok(())
 	}
