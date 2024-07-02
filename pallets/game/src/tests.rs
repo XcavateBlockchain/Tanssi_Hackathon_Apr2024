@@ -947,7 +947,7 @@ fn handle_offer_accept_works() {
 			crate::DifficultyLevel::Player,
 		));
 		System::assert_last_event(
-			Event::GameStarted { player: [0; 32].into(), game_id: 6, ending_block: 9 }.into(),
+			Event::GameStarted { player: [0; 32].into(), game_id: 6, ending_block: 9, property_id: 147229391 }.into(),
 		);
 		run_to_block(20);
 		assert_eq!(GameModule::users::<AccountId>([0; 32].into()).unwrap().nfts.xorange, 3);
@@ -1153,7 +1153,6 @@ fn add_property_works() {
 		let new_property = PropertyInfoData {
 			id: 147031382,
 			data: "nfdjakl;fueif;janf,dnfm,dhfhfdksks".as_bytes().to_vec().try_into().unwrap(),
-			price: "kkjfkdjdkdjdkdjdk".as_bytes().to_vec().try_into().unwrap(),
 		};
 		assert_ok!(GameModule::add_property(RuntimeOrigin::root(), new_property));
 		assert_eq!(GameModule::game_properties().len(), 5);

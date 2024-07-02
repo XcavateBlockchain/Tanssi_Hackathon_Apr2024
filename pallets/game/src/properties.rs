@@ -6,28 +6,24 @@ impl<T: Config> Pallet<T> {
 		let new_property = PropertyInfoData {
 			id: 147229391,
 			data: "nfdjakl;fueif;janf,dnfm,dhfhfdksks".as_bytes().to_vec().try_into().unwrap(),
-			price: "kkjfkdjdkdjdkdjdk".as_bytes().to_vec().try_into().unwrap(),
 		};
 		GameProperties::<T>::try_append(new_property.clone())
 			.map_err(|_| Error::<T>::TooManyTest)?;
 		let new_property = PropertyInfoData {
 			id: 146480642,
 			data: "nfdjakl;fueif;janf,dnfm,dhfhfdksks".as_bytes().to_vec().try_into().unwrap(),
-			price: "kkjfkdjdkdjdkdjdk".as_bytes().to_vec().try_into().unwrap(),
 		};
 		GameProperties::<T>::try_append(new_property.clone())
 			.map_err(|_| Error::<T>::TooManyTest)?;
 		let new_property = PropertyInfoData {
 			id: 147031382,
 			data: "nfdjakl;fueif;janf,dnfm,dhfhfdksks".as_bytes().to_vec().try_into().unwrap(),
-			price: "kkjfkdjdkdjdkdjdk".as_bytes().to_vec().try_into().unwrap(),
 		};
 		GameProperties::<T>::try_append(new_property.clone())
 			.map_err(|_| Error::<T>::TooManyTest)?;
 		let new_property = PropertyInfoData {
 			id: 147031382,
 			data: "nfdjakl;fueif;janf,dnfm,dhfhfdksks".as_bytes().to_vec().try_into().unwrap(),
-			price: "kkjfkdjdkdjdkdjdk".as_bytes().to_vec().try_into().unwrap(),
 		};
 		GameProperties::<T>::try_append(new_property.clone())
 			.map_err(|_| Error::<T>::TooManyTest)?;

@@ -219,7 +219,7 @@ pub mod pallet {
 		/// A user has received points.
 		PointsReceived { receiver: AccountIdOf<T>, amount: u32 },
 		/// A game has started.
-		GameStarted { player: AccountIdOf<T>, game_id: u32, ending_block: BlockNumberFor<T> },
+		GameStarted { player: AccountIdOf<T>, game_id: u32, ending_block: BlockNumberFor<T>, property_id: u32 },
 		/// An answer has been submitted.
 		AnswerSubmitted { player: AccountIdOf<T>, game_id: u32, guess: u32 },
 		/// The result has been checked.
@@ -497,13 +497,14 @@ pub mod pallet {
 			let random_number = u32_value as usize % game_properties.len();
 			let property = game_properties[random_number].clone();
 			let game_datas =
-				GameData { difficulty: game_type, player: signer.clone(), property, guess: None };
+				GameData { difficulty: game_type, player: signer.clone(), property: property.clone(), guess: None };
 			game_properties.retain(|property| property.id as usize != random_number);
 			GameProperties::<T>::put(game_properties);
 			GameInfo::<T>::insert(game_id, game_datas);
 			let next_game_id = game_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 			GameId::<T>::put(next_game_id);
-			Self::deposit_event(Event::<T>::GameStarted { player: signer, game_id, ending_block: expiry_block });
+			// Submit the encrypted property data and delete the price
+			Self::deposit_event(Event::<T>::GameStarted { player: signer, game_id, ending_block: expiry_block, property_id: property.id });
 			Ok(())
 		}
 

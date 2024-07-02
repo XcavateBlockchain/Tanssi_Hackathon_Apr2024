@@ -104,7 +104,6 @@ pub struct OfferInfo<CollectionId, ItemId, T: Config> {
 pub struct PropertyInfoData<T: Config> {
 	pub id: u32,
 	pub data: BoundedVec<u8, <T as Config>::StringLimit>,
-	pub price: BoundedVec<u8, <T as Config>::StringLimit>,
 }
 
 /// Struct for the user datas.
