@@ -368,7 +368,9 @@ fn leaderboard_works() {
 		assert_eq!(GameModule::game_info(0).is_none(), true);
 		assert_eq!(GameModule::users::<AccountId>([2; 32].into()).unwrap().points, 155);
 		assert_eq!(GameModule::users::<AccountId>([1; 32].into()).unwrap().points, 80);
+		assert_eq!(GameModule::users::<AccountId>([1; 32].into()).unwrap().wins, 1);
 		assert_eq!(GameModule::users::<AccountId>([0; 32].into()).unwrap().points, 70);
+		assert_eq!(GameModule::users::<AccountId>([0; 32].into()).unwrap().wins, 1);
 		assert_eq!(GameModule::leaderboard().len(), 3);
 		assert_eq!(GameModule::leaderboard()[0], ([2; 32].into(), 155));
 		assert_eq!(GameModule::leaderboard()[1], ([1; 32].into(), 80));
@@ -715,6 +717,7 @@ fn withdraw_offer_works() {
 		));
 		assert_eq!(GameModule::game_info(0).is_none(), true);
 		assert_eq!(GameModule::users::<AccountId>([0; 32].into()).unwrap().points, 155);
+		assert_eq!(GameModule::users::<AccountId>([0; 32].into()).unwrap().wins, 1);
 		assert_eq!(Nfts::owner(0, 0).unwrap(), [0; 32].into());
 		practise_round([1; 32].into(), 2);
 		assert_ok!(GameModule::play_game(
@@ -939,6 +942,18 @@ fn handle_offer_accept_works() {
 				message: Some("ItemLocked")
 			})
 		);
+		assert_ok!(GameModule::play_game(
+			RuntimeOrigin::signed([0; 32].into()),
+			crate::DifficultyLevel::Player,
+		));
+		System::assert_last_event(
+			Event::GameStarted { player: [0; 32].into(), game_id: 6, ending_block: 9 }.into(),
+		);
+		run_to_block(20);
+		assert_eq!(GameModule::users::<AccountId>([0; 32].into()).unwrap().nfts.xorange, 3);
+		assert_eq!(GameModule::users::<AccountId>([0; 32].into()).unwrap().points, 470);
+		assert_eq!(GameModule::users::<AccountId>([0; 32].into()).unwrap().wins, 3);
+		assert_eq!(GameModule::users::<AccountId>([0; 32].into()).unwrap().losses, 1);
 	});
 }
 

@@ -219,7 +219,7 @@ pub mod pallet {
 		/// A user has received points.
 		PointsReceived { receiver: AccountIdOf<T>, amount: u32 },
 		/// A game has started.
-		GameStarted { player: AccountIdOf<T>, game_id: u32 },
+		GameStarted { player: AccountIdOf<T>, game_id: u32, ending_block: BlockNumberFor<T> },
 		/// An answer has been submitted.
 		AnswerSubmitted { player: AccountIdOf<T>, game_id: u32, guess: u32 },
 		/// The result has been checked.
@@ -473,31 +473,22 @@ pub mod pallet {
 				Users::<T>::insert(signer.clone(), user);
 			}
 			let game_id = GameId::<T>::get();
-			if game_type == DifficultyLevel::Player {
-				let current_block_number = <frame_system::Pallet<T>>::block_number();
-				let expiry_block = current_block_number.saturating_add(8u32.into());
-
-				GamesExpiring::<T>::try_mutate(expiry_block, |keys| {
-					keys.try_push(game_id).map_err(|_| Error::<T>::TooManyGames)?;
-					Ok::<(), DispatchError>(())
-				})?;
+			let current_block_number = <frame_system::Pallet<T>>::block_number();
+    
+			// Determine expiry block based on game type
+			let expiry_block = if game_type == DifficultyLevel::Player {
+				current_block_number.saturating_add(8u32.into())
 			} else if game_type == DifficultyLevel::Pro {
-				let current_block_number = <frame_system::Pallet<T>>::block_number();
-				let expiry_block = current_block_number.saturating_add(5u32.into());
-
-				GamesExpiring::<T>::try_mutate(expiry_block, |keys| {
-					keys.try_push(game_id).map_err(|_| Error::<T>::TooManyGames)?;
-					Ok::<(), DispatchError>(())
-				})?;
+				current_block_number.saturating_add(5u32.into())
 			} else {
-				let current_block_number = <frame_system::Pallet<T>>::block_number();
-				let expiry_block = current_block_number.saturating_add(10u32.into());
-
-				GamesExpiring::<T>::try_mutate(expiry_block, |keys| {
-					keys.try_push(game_id).map_err(|_| Error::<T>::TooManyGames)?;
-					Ok::<(), DispatchError>(())
-				})?;
-			}
+				current_block_number.saturating_add(10u32.into())
+			};
+		
+			GamesExpiring::<T>::try_mutate(expiry_block, |keys| {
+				keys.try_push(game_id).map_err(|_| Error::<T>::TooManyGames)?;
+				Ok::<(), DispatchError>(())
+			})?;
+			
 			let (hashi, _) = T::GameRandomness::random(&[(game_id % 256) as u8]);
 			let u32_value = u32::from_le_bytes(
 				hashi.as_ref()[4..8].try_into().map_err(|_| Error::<T>::ConversionError)?,
@@ -512,7 +503,7 @@ pub mod pallet {
 			GameInfo::<T>::insert(game_id, game_datas);
 			let next_game_id = game_id.checked_add(1).ok_or(Error::<T>::ArithmeticOverflow)?;
 			GameId::<T>::put(next_game_id);
-			Self::deposit_event(Event::<T>::GameStarted { player: signer, game_id });
+			Self::deposit_event(Event::<T>::GameStarted { player: signer, game_id, ending_block: expiry_block });
 			Ok(())
 		}
 
