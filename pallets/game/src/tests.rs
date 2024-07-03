@@ -947,7 +947,7 @@ fn handle_offer_accept_works() {
 			crate::DifficultyLevel::Player,
 		));
 		System::assert_last_event(
-			Event::GameStarted { player: [0; 32].into(), game_id: 6, ending_block: 9, property_id: 147229391 }.into(),
+			Event::GameStarted { player: [0; 32].into(), game_id: 6, ending_block: 9 }.into(),
 		);
 		run_to_block(20);
 		assert_eq!(GameModule::users::<AccountId>([0; 32].into()).unwrap().nfts.xorange, 3);
